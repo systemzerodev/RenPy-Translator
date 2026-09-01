@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "renpy-translator"
+version = "0.1.0.dev0"
+description = "A modern open-source desktop translation tool for Ren'Py visual novels."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+
+dependencies = [
+    "customtkinter>=6.0,<7.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
