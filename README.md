@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner/renpy-translator-banner.png" alt="RenPy Translator Banner" width="100%">
+  <img src="assets/banner/banner.png" alt="RenPy Translator Banner" width="100%">
 </p>
 
 <h1 align="center">RenPy Translator</h1>

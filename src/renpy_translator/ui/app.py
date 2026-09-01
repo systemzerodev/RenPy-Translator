@@ -5,7 +5,8 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 
-from renpy_translator.core.scanner import ScriptScanner
+from renpy_translator.core.extractor import ProjectExtractor
+from renpy_translator.core.models import DialogueEntry
 
 
 class RenPyTranslatorApp(ctk.CTk):
@@ -15,6 +16,7 @@ class RenPyTranslatorApp(ctk.CTk):
         super().__init__()
 
         self.project_path: Path | None = None
+        self.dialogues: list[DialogueEntry] = []
 
         self.title("RenPy Translator")
         self.geometry("1280x760")
@@ -40,7 +42,7 @@ class RenPyTranslatorApp(ctk.CTk):
         self.grid_rowconfigure(2, weight=0)
 
     def _create_header(self) -> None:
-        """Create the top application toolbar."""
+        """Create the top toolbar."""
 
         self.header = ctk.CTkFrame(
             self,
@@ -54,7 +56,10 @@ class RenPyTranslatorApp(ctk.CTk):
             sticky="nsew",
         )
 
-        self.header.grid_columnconfigure(0, weight=1)
+        self.header.grid_columnconfigure(
+            0,
+            weight=1,
+        )
 
         self.app_title = ctk.CTkLabel(
             self.header,
@@ -142,6 +147,7 @@ class RenPyTranslatorApp(ctk.CTk):
             column=0,
             sticky="nsew",
         )
+
         self.sidebar.grid_propagate(False)
 
         self.files_title = ctk.CTkLabel(
@@ -198,8 +204,15 @@ class RenPyTranslatorApp(ctk.CTk):
             sticky="nsew",
         )
 
-        self.editor.grid_columnconfigure(0, weight=1)
-        self.editor.grid_rowconfigure(1, weight=1)
+        self.editor.grid_columnconfigure(
+            0,
+            weight=1,
+        )
+
+        self.editor.grid_rowconfigure(
+            1,
+            weight=1,
+        )
 
         self.editor_header = ctk.CTkFrame(
             self.editor,
@@ -259,55 +272,23 @@ class RenPyTranslatorApp(ctk.CTk):
             0,
             weight=1,
         )
+
         self.editor_content.grid_rowconfigure(
             0,
             weight=1,
         )
 
-        self.welcome_frame = ctk.CTkFrame(
-            self.editor_content,
-            fg_color="transparent",
-        )
-        self.welcome_frame.grid(
-            row=0,
-            column=0,
-        )
-
-        self.welcome_title = ctk.CTkLabel(
-            self.welcome_frame,
-            text="No Ren'Py project opened",
-            font=ctk.CTkFont(
-                size=21,
-                weight="bold",
-            ),
-        )
-        self.welcome_title.pack(
-            pady=(0, 8),
-        )
-
-        self.welcome_text = ctk.CTkLabel(
-            self.welcome_frame,
-            text=(
+        self._show_welcome_editor(
+            title="No Ren'Py project opened",
+            message=(
                 "Open a Ren'Py game folder to scan its scripts "
                 "and begin translating."
             ),
-            text_color="gray60",
-            font=ctk.CTkFont(size=14),
+            show_button=True,
         )
-        self.welcome_text.pack(
-            pady=(0, 18),
-        )
-
-        self.welcome_button = ctk.CTkButton(
-            self.welcome_frame,
-            text="Open Game",
-            width=130,
-            command=self._open_game,
-        )
-        self.welcome_button.pack()
 
     def _create_statusbar(self) -> None:
-        """Create the bottom application status bar."""
+        """Create the bottom status bar."""
 
         self.statusbar = ctk.CTkFrame(
             self,
@@ -355,13 +336,22 @@ class RenPyTranslatorApp(ctk.CTk):
         )
 
     def _clear_project_files(self) -> None:
-        """Remove all widgets from the project file list."""
+        """Remove all widgets from the sidebar file list."""
 
         for widget in self.project_files.winfo_children():
             widget.destroy()
 
-    def _show_sidebar_message(self, message: str) -> None:
-        """Display a simple message inside the project sidebar."""
+    def _clear_editor_content(self) -> None:
+        """Remove all widgets from the editor content area."""
+
+        for widget in self.editor_content.winfo_children():
+            widget.destroy()
+
+    def _show_sidebar_message(
+        self,
+        message: str,
+    ) -> None:
+        """Display a message inside the project sidebar."""
 
         self._clear_project_files()
 
@@ -378,8 +368,59 @@ class RenPyTranslatorApp(ctk.CTk):
             anchor="w",
         )
 
+    def _show_welcome_editor(
+        self,
+        title: str,
+        message: str,
+        show_button: bool = False,
+    ) -> None:
+        """Display a centered message inside the editor."""
+
+        self._clear_editor_content()
+
+        welcome_frame = ctk.CTkFrame(
+            self.editor_content,
+            fg_color="transparent",
+        )
+        welcome_frame.grid(
+            row=0,
+            column=0,
+        )
+
+        title_label = ctk.CTkLabel(
+            welcome_frame,
+            text=title,
+            font=ctk.CTkFont(
+                size=21,
+                weight="bold",
+            ),
+        )
+        title_label.pack(
+            pady=(0, 8),
+        )
+
+        message_label = ctk.CTkLabel(
+            welcome_frame,
+            text=message,
+            text_color="gray60",
+            font=ctk.CTkFont(size=14),
+            wraplength=650,
+        )
+        message_label.pack(
+            pady=(0, 18),
+        )
+
+        if show_button:
+            open_button = ctk.CTkButton(
+                welcome_frame,
+                text="Open Game",
+                width=130,
+                command=self._open_game,
+            )
+            open_button.pack()
+
     def _open_game(self) -> None:
-        """Open a folder picker and select a Ren'Py game folder."""
+        """Open a folder picker and select a Ren'Py project."""
 
         selected_folder = filedialog.askdirectory(
             title="Select Ren'Py Game Folder"
@@ -388,10 +429,22 @@ class RenPyTranslatorApp(ctk.CTk):
         if not selected_folder:
             return
 
-        self.project_path = Path(selected_folder)
+        self.project_path = Path(
+            selected_folder
+        )
+
+        self.dialogues = []
 
         self._show_sidebar_message(
             self.project_path.name
+        )
+
+        self._show_welcome_editor(
+            title="Project ready to scan",
+            message=(
+                "The project folder has been selected. "
+                "Click Scan to find and parse Ren'Py scripts."
+            ),
         )
 
         self.scan_button.configure(
@@ -414,32 +467,103 @@ class RenPyTranslatorApp(ctk.CTk):
             text="Progress: 0 / 0 translated"
         )
 
-        self.welcome_title.configure(
-            text="Project ready to scan"
-        )
-
-        self.welcome_text.configure(
-            text=(
-                "The project folder has been selected. "
-                "Click Scan to find Ren'Py script files."
-            )
-        )
-
         self.status_label.configure(
             text=f"Project opened: {self.project_path}"
         )
 
     def _scan_project(self) -> None:
-        """Scan the selected project for Ren'Py script files."""
+        """Scan and parse the currently selected project."""
 
         if self.project_path is None:
             return
 
-        scanner = ScriptScanner(
+        self.status_label.configure(
+            text="Scanning Ren'Py project..."
+        )
+
+        self.update_idletasks()
+
+        extractor = ProjectExtractor(
             self.project_path
         )
 
-        script_files = scanner.scan()
+        script_files, dialogues = (
+            extractor.extract()
+        )
+
+        self.dialogues = dialogues
+
+        self._render_script_files(
+            script_files
+        )
+
+        if not script_files:
+            self._show_welcome_editor(
+                title="No Ren'Py scripts found",
+                message=(
+                    "Make sure you selected a Ren'Py project "
+                    "or its game folder."
+                ),
+                show_button=True,
+            )
+
+            self.dialogue_count.configure(
+                text="0 dialogues"
+            )
+
+            self.status_label.configure(
+                text="No Ren'Py script files found."
+            )
+
+            return
+
+        if not dialogues:
+            self._show_welcome_editor(
+                title="No supported dialogue found",
+                message=(
+                    "Ren'Py scripts were found, but the current "
+                    "parser did not detect supported dialogue."
+                ),
+            )
+
+            self.dialogue_count.configure(
+                text="0 dialogues"
+            )
+
+            self.status_label.configure(
+                text=(
+                    f"Found {len(script_files)} scripts, "
+                    "but no supported dialogue."
+                )
+            )
+
+            return
+
+        self._render_dialogues()
+
+        self.dialogue_count.configure(
+            text=f"{len(dialogues)} dialogues"
+        )
+
+        self.progress_label.configure(
+            text=(
+                f"Progress: 0 / "
+                f"{len(dialogues)} translated"
+            )
+        )
+
+        self.status_label.configure(
+            text=(
+                f"Found {len(script_files)} scripts "
+                f"and {len(dialogues)} dialogues."
+            )
+        )
+
+    def _render_script_files(
+        self,
+        script_files: list[Path],
+    ) -> None:
+        """Display discovered Ren'Py scripts in the sidebar."""
 
         self._clear_project_files()
 
@@ -447,27 +571,22 @@ class RenPyTranslatorApp(ctk.CTk):
             self._show_sidebar_message(
                 "No .rpy files found"
             )
-
-            self.status_label.configure(
-                text="No Ren'Py script files found."
-            )
-
-            self.welcome_title.configure(
-                text="No Ren'Py scripts found"
-            )
-
-            self.welcome_text.configure(
-                text=(
-                    "Make sure you selected a Ren'Py project "
-                    "or its game folder."
-                )
-            )
-
             return
+
+        if self.project_path is None:
+            return
+
+        extractor = ProjectExtractor(
+            self.project_path
+        )
+
+        script_root = (
+            extractor.scanner.script_root
+        )
 
         for script_file in script_files:
             relative_path = script_file.relative_to(
-                scanner.script_root
+                script_root
             )
 
             display_path = str(
@@ -486,25 +605,139 @@ class RenPyTranslatorApp(ctk.CTk):
                 anchor="w",
             )
 
-        file_count = len(script_files)
+    def _render_dialogues(self) -> None:
+        """Display extracted dialogue inside the editor."""
 
-        self.status_label.configure(
-            text=(
-                f"Found {file_count} "
-                "Ren'Py script files."
+        self._clear_editor_content()
+
+        table = ctk.CTkScrollableFrame(
+            self.editor_content,
+            fg_color="transparent",
+        )
+        table.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=8,
+            pady=8,
+        )
+
+        table.grid_columnconfigure(
+            0,
+            weight=0,
+            minsize=70,
+        )
+
+        table.grid_columnconfigure(
+            1,
+            weight=0,
+            minsize=110,
+        )
+
+        table.grid_columnconfigure(
+            2,
+            weight=1,
+            minsize=300,
+        )
+
+        table.grid_columnconfigure(
+            3,
+            weight=1,
+            minsize=300,
+        )
+
+        headers = (
+            "Line",
+            "Speaker",
+            "Original Text",
+            "Translation",
+        )
+
+        for column, header in enumerate(
+            headers
+        ):
+            header_label = ctk.CTkLabel(
+                table,
+                text=header,
+                font=ctk.CTkFont(
+                    size=13,
+                    weight="bold",
+                ),
+                anchor="w",
             )
-        )
-
-        self.welcome_title.configure(
-            text=f"{file_count} Ren'Py scripts found"
-        )
-
-        self.welcome_text.configure(
-            text=(
-                "The project has been scanned successfully. "
-                "Dialogue extraction will be added next."
+            header_label.grid(
+                row=0,
+                column=column,
+                sticky="ew",
+                padx=8,
+                pady=(6, 12),
             )
-        )
+
+        for row_index, dialogue in enumerate(
+            self.dialogues,
+            start=1,
+        ):
+            line_label = ctk.CTkLabel(
+                table,
+                text=str(
+                    dialogue.line_number
+                ),
+                anchor="w",
+            )
+            line_label.grid(
+                row=row_index,
+                column=0,
+                sticky="ew",
+                padx=8,
+                pady=6,
+            )
+
+            speaker_text = (
+                dialogue.speaker
+                if dialogue.speaker
+                else "Narrator"
+            )
+
+            speaker_label = ctk.CTkLabel(
+                table,
+                text=speaker_text,
+                anchor="w",
+            )
+            speaker_label.grid(
+                row=row_index,
+                column=1,
+                sticky="ew",
+                padx=8,
+                pady=6,
+            )
+
+            original_label = ctk.CTkLabel(
+                table,
+                text=dialogue.text,
+                anchor="w",
+                justify="left",
+                wraplength=360,
+            )
+            original_label.grid(
+                row=row_index,
+                column=2,
+                sticky="ew",
+                padx=8,
+                pady=6,
+            )
+
+            translation_entry = ctk.CTkEntry(
+                table,
+                placeholder_text="Enter translation...",
+                height=36,
+            )
+            translation_entry.grid(
+                row=row_index,
+                column=3,
+                sticky="ew",
+                padx=8,
+                pady=6,
+            )
 
 
 def run_app() -> None:
